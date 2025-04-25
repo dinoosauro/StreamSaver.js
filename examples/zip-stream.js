@@ -1,9 +1,13 @@
+/*
+  This script is from StreamSaver.js library. I've made a small edit to permit custom file names, but, other than that, there's nothing else.
+*/
+
 class Crc32 {
-  constructor () {
+  constructor() {
     this.crc = -1
   }
 
-  append (data) {
+  append(data) {
     var crc = this.crc | 0; var table = this.table
     for (var offset = 0, len = data.length | 0; offset < len; offset++) {
       crc = (crc >>> 8) ^ table[(crc ^ data[offset]) & 0xFF]
@@ -11,7 +15,7 @@ class Crc32 {
     this.crc = crc
   }
 
-  get () {
+  get() {
     return ~this.crc
   }
 }
@@ -51,7 +55,7 @@ const pump = zipObj => zipObj.reader.read().then(chunk => {
  * @param  {Object} underlyingSource [description]
  * @return {Boolean}                  [description]
  */
-function createWriter (underlyingSource) {
+function createWriter(underlyingSource) {
   const files = Object.create(null)
   const filenames = []
   const encoder = new TextEncoder()
@@ -60,7 +64,7 @@ function createWriter (underlyingSource) {
   let ctrl
   let activeZipObject, closed
 
-  function next () {
+  function next() {
     activeZipIndex++
     activeZipObject = files[filenames[activeZipIndex]]
     if (activeZipObject) processNextChunk()
@@ -68,10 +72,10 @@ function createWriter (underlyingSource) {
   }
 
   var zipWriter = {
-    enqueue (fileLike) {
+    enqueue(fileLike, fileLikeName) {
       if (closed) throw new TypeError('Cannot enqueue a chunk into a readable stream that is closed or has been requested to be closed')
 
-      let name = fileLike.name.trim()
+      let name = (fileLikeName ?? fileLike.name).trim()
       const date = new Date(typeof fileLike.lastModified === 'undefined' ? Date.now() : fileLike.lastModified)
 
       if (fileLike.directory && !name.endsWith('/')) name += '/'
@@ -88,7 +92,7 @@ function createWriter (underlyingSource) {
         comment: encoder.encode(fileLike.comment || ''),
         compressedLength: 0,
         uncompressedLength: 0,
-        writeHeader () {
+        writeHeader() {
           var header = getDataHelper(26)
           var data = getDataHelper(30 + nameBuf.length)
 
@@ -107,7 +111,7 @@ function createWriter (underlyingSource) {
           offset += data.array.length
           ctrl.enqueue(data.array)
         },
-        writeFooter () {
+        writeFooter() {
           var footer = getDataHelper(16)
           footer.view.setUint32(0, 0x504b0708)
 
@@ -132,14 +136,14 @@ function createWriter (underlyingSource) {
         processNextChunk()
       }
     },
-    close () {
+    close() {
       if (closed) throw new TypeError('Cannot close a readable stream that has already been requested to be closed')
       if (!activeZipObject) closeZip()
       closed = true
     }
   }
 
-  function closeZip () {
+  function closeZip() {
     var length = 0
     var index = 0
     var indexFilename, file
@@ -171,7 +175,7 @@ function createWriter (underlyingSource) {
     ctrl.close()
   }
 
-  function processNextChunk () {
+  function processNextChunk() {
     if (!activeZipObject) return
     if (activeZipObject.directory) return activeZipObject.writeFooter(activeZipObject.writeHeader())
     if (activeZipObject.reader) return pump(activeZipObject)
@@ -186,7 +190,7 @@ function createWriter (underlyingSource) {
       ctrl = c
       underlyingSource.start && Promise.resolve(underlyingSource.start(zipWriter))
     },
-    pull () {
+    pull() {
       return processNextChunk() || (
         underlyingSource.pull &&
         Promise.resolve(underlyingSource.pull(zipWriter))
@@ -195,4 +199,4 @@ function createWriter (underlyingSource) {
   })
 }
 
-window.ZIP = createWriter
+self.ZIP = createWriter
